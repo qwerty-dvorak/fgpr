@@ -10,7 +10,7 @@ set_toolset("sh", "gcc")
 
 add_requires("libusb", {system = true})
 
--- driver, matcher and storage
+-- driver, matcher and storage, shared by the tool and the PAM module
 target("elanfp-core")
     set_kind("static")
     add_files("src/elan.c", "src/match.c", "src/store.c")
@@ -25,3 +25,13 @@ target("elanfp")
     add_deps("elanfp-core")
     add_files("src/image.c", "src/main.c")
     add_packages("libusb")
+
+-- PAM module: only pam_sm_* are exported
+target("pam_elanfp")
+    set_kind("shared")
+    set_prefixname("")
+    set_symbols("hidden")
+    add_deps("elanfp-core")
+    add_files("src/pam_elanfp.c")
+    add_packages("libusb")
+    add_syslinks("pam")
