@@ -226,6 +226,7 @@ after a few samples.
 | File | Role |
 |---|---|
 | `src/elan.c` | USB protocol, calibration, capture and retry policy |
+| `src/auth.c` | shared sensor session and matching for PAM and FIDO |
 | `src/match.c` | feature extraction and matching |
 | `src/store.c` | template files, per-user finger directory |
 | `src/image.c` | 8-bit conversion and PGM output |

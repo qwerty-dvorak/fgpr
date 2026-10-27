@@ -13,7 +13,7 @@ add_requires("libusb", {system = true})
 -- driver, matcher and storage, shared by the tool and the PAM module
 target("elanfp-core")
     set_kind("static")
-    add_files("src/elan.c", "src/match.c", "src/store.c")
+    add_files("src/elan.c", "src/auth.c", "src/match.c", "src/store.c")
     add_headerfiles("src/*.h")
     add_includedirs("src", {public = true})
     add_cflags("-fPIC")

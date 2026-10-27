@@ -8,6 +8,7 @@
  * Options: dir=<template dir> (default /var/lib/elanfp)
  */
 #define _POSIX_C_SOURCE 200809L
+#include "auth.h"
 #include "elan.h"
 #include "match.h"
 #include "store.h"
@@ -46,33 +47,29 @@ static int is_remote(pam_handle_t *pamh)
 static int fingerprint(pam_handle_t *pamh, const char *user,
 		       const struct fp_user *u)
 {
-	uint16_t img[FP_N];
-	struct elan e;
+	struct fp_auth_session session;
+	enum fp_auth_open_result opened;
 	int ret = 2;
 
 	elan_verbose = 0;
-	if (elan_open(&e)) {
-		pam_syslog(pamh, LOG_WARNING, "fingerprint sensor unavailable");
+	opened = fp_auth_open(&session, u);
+	if (opened != FP_AUTH_OPEN_OK) {
+		pam_syslog(pamh, LOG_WARNING, "%s",
+			   opened == FP_AUTH_OPEN_UNAVAILABLE ?
+			   "fingerprint sensor unavailable" :
+			   "fingerprint sensor calibration failed");
 		return 2;
-	}
-	if (e.w != FP_W || e.h != FP_H || elan_calibrate(&e, 0)) {
-		pam_syslog(pamh, LOG_WARNING, "fingerprint sensor calibration failed");
-		goto out;
 	}
 
 	for (int i = 0; i < TRIES; i++) {
 		say("Place your finger on the fingerprint reader", pamh);
-		int r = elan_scan(&e, img, 1, say, pamh);
+		int score, area;
+		int r = fp_auth_scan(&session, say, pamh, &score, &area);
 		if (r) {
 			/* nobody touched it: quietly go on to the password */
 			ret = i == 0 && r == ELAN_ETIMEOUT ? 2 : 1;
 			break;
 		}
-		struct fp_probe *p = fp_probe_new(img);
-		int score = p ? fp_user_match(u, p) : 0;
-		int area = p ? fp_probe_area(p) : 0;
-
-		fp_probe_free(p);
 		if (score >= FP_THRESHOLD) {
 			pam_syslog(pamh, LOG_NOTICE, "fingerprint accepted for %s (score %d)",
 				   user, score);
@@ -84,10 +81,9 @@ static int fingerprint(pam_handle_t *pamh, const char *user,
 		ret = 1;
 		say(area < FP_MIN_AREA ? "Fingerprint not recognized, press flatter"
 				       : "Fingerprint not recognized", pamh);
-		elan_finger_off(&e);
+		fp_auth_finger_off(&session);
 	}
-out:
-	elan_close(&e);
+	fp_auth_close(&session);
 	return ret;
 }
 

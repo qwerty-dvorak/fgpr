@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include "hid.h"
+#include "auth.h"
 #include "uhid.h"
 #include "ctap.h"
 #include "elan.h"
@@ -136,36 +137,27 @@ static int init_channel(struct server *s, const uint8_t *report)
 /* Real fingerprint comparison. No touch-only or password-based success. */
 static int fingerprint(const struct fp_user *u)
 {
-	uint16_t img[FP_N];
-	struct elan e;
+	struct fp_auth_session session;
 	int result = 2;
 
 	elan_verbose = 0;
-	if (elan_open(&e))
+	if (fp_auth_open(&session, u) != FP_AUTH_OPEN_OK)
 		return result;
-	if (e.w != FP_W || e.h != FP_H || elan_calibrate(&e, 0))
-		goto out;
 	for (int i = 0; i < 3; i++) {
-		struct fp_probe *p;
-		int score, r = elan_scan(&e, img, 1, NULL, NULL);
+		int score, area;
+		int r = fp_auth_scan(&session, NULL, NULL, &score, &area);
 
 		if (r)
 			break;
-		p = fp_probe_new(img);
-		if (!p)
-			break;
-		score = fp_user_match(u, p);
-		fp_probe_free(p);
 		if (score >= FP_THRESHOLD) {
 			result = 0;
 			break;
 		}
 		result = 1;
-		if (i < 2 && elan_finger_off(&e))
+		if (i < 2 && fp_auth_finger_off(&session))
 			break;
 	}
- out:
-	elan_close(&e);
+	fp_auth_close(&session);
 	return result;
 }
 
