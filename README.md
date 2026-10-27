@@ -103,6 +103,19 @@ security key do not transfer to this authenticator. A website explicitly
 requiring a platform authenticator, hardware attestation, CTAP1/U2F, or a PIN
 is not supported by this software key.
 
+**GitHub:** a successful localhost test does not register this key with GitHub.
+Sign in using an existing method, then open **Settings → Password and
+authentication → Passkeys → Add a passkey**, choose the security-key option,
+and touch the enrolled finger. For a second-factor-only credential, use
+the **Security keys** section under two-factor authentication instead.
+Keep the existing recovery method until the new credential is tested.
+See [GitHub's passkey registration guide](https://docs.github.com/en/authentication/authenticating-with-a-passkey/managing-your-passkeys).
+
+`NotAllowedError` is a generic browser error, not proof of a sensor failure.
+A credential registered for localhost or another authenticator cannot satisfy
+GitHub's request. Register this key separately with each website; never bypass
+the relying-party check or lower the fingerprint threshold to work around it.
+
 The daemon supports CTAP2 `FIDO_2_0`, ES256, built-in fingerprint verification,
 resident/discoverable credentials, and `none` attestation. It has no FIDO PIN
 or biometric-enrollment protocol; enroll fingers with `elanfp`. Browser
