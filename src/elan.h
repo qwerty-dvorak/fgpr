@@ -31,6 +31,9 @@ typedef void (*elan_say_fn)(const char *msg, void *arg);
 
 int elan_open(struct elan *e);
 void elan_close(struct elan *e);
+/* After killing/reaping a scan process: stop without querying pending replies.
+ * Returns ELAN_EIO without sending commands if interface 0 cannot be claimed. */
+int elan_cancel_scan(void);
 /* Capture a new background; force=1 runs the sensor calibration first. */
 int elan_calibrate(struct elan *e, int force);
 /* Wait up to ~11 s for a finger, then fill img (w*h) with frame - background. */

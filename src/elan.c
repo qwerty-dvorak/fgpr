@@ -71,6 +71,14 @@ static int cmd(struct elan *e, const uint8_t *c, int clen, uint8_t ep,
 	return xfer(e, ep, resp, rlen, tmo);
 }
 
+/* Upstream libfprint elan.h: stop_cmd is reply-free and switches the LED off. */
+static int stop_scan(struct elan *e)
+{
+	static const uint8_t c_stop[] = { 0x00, 0x0b };
+
+	return cmd(e, c_stop, 2, 0, NULL, 0, TMO_CMD);
+}
+
 /* Frame arrives as w*h little-endian u16, same as this x86_64 host. */
 static int get_frame(struct elan *e, uint16_t *img)
 {
@@ -114,6 +122,8 @@ int elan_open(struct elan *e)
 	r = libusb_claim_interface(e->usb, 0);
 	if (r) {
 		LOG("elan: claim interface: %s\n", libusb_error_name(r));
+		libusb_close(e->usb);
+		e->usb = NULL;
 		goto fail;
 	}
 
@@ -142,10 +152,8 @@ fail:
 
 void elan_close(struct elan *e)
 {
-	static const uint8_t c_stop[] = { 0x00, 0x0b }; /* led off, stop scan */
-
 	if (e->usb) {
-		cmd(e, c_stop, 2, 0, NULL, 0, TMO_CMD);
+		stop_scan(e);
 		libusb_release_interface(e->usb, 0);
 		libusb_close(e->usb);
 	}
@@ -153,6 +161,27 @@ void elan_close(struct elan *e)
 		libusb_exit(e->ctx);
 	free(e->bg);
 	memset(e, 0, sizeof(*e));
+}
+
+int elan_cancel_scan(void)
+{
+	struct elan e = { 0 };
+	int r = ELAN_EIO;
+
+	if (libusb_init(&e.ctx))
+		return r;
+	e.usb = libusb_open_device_with_vid_pid(e.ctx, ELAN_VID, ELAN_PID);
+	if (e.usb) {
+		/* Never send commands to an interface still owned by another scan. */
+		if (!libusb_claim_interface(e.usb, 0)) {
+			/* No queries: a killed pre_scan may have left a pending reply. */
+			r = stop_scan(&e);
+			libusb_release_interface(e.usb, 0);
+		}
+		libusb_close(e.usb);
+	}
+	libusb_exit(e.ctx);
+	return r;
 }
 
 static int run_calibration(struct elan *e)
@@ -214,7 +243,7 @@ int elan_finger_off(struct elan *e)
 	return r;
 }
 
-int elan_capture(struct elan *e, uint16_t *img)
+static int capture_frame(struct elan *e, uint16_t *img)
 {
 	static const uint8_t c_wait[] = { 0x40, 0x3f };
 	static const uint8_t c_discard[] = { 0x9a, 0x14 };
@@ -262,6 +291,23 @@ int elan_capture(struct elan *e, uint16_t *img)
 			return ELAN_ERECAL;
 		return ELAN_OK;
 	}
+}
+
+int elan_capture(struct elan *e, uint16_t *img)
+{
+	/*
+	 * Upstream libfprint's CAPTURE_LED_ON precedes CAPTURE_WAIT_FINGER.
+	 * This command has no color argument; red/RGB control is not established.
+	 */
+	static const uint8_t c_led_on[] = { 0x40, 0x31 };
+	int r = cmd(e, c_led_on, 2, 0, NULL, 0, TMO_CMD);
+	int stop_r;
+
+	if (!r)
+		r = capture_frame(e, img);
+	/* Also stop after LED-on errors: a partial write may have reached it. */
+	stop_r = stop_scan(e);
+	return r ? r : stop_r;
 }
 
 static void say(elan_say_fn fn, void *arg, const char *msg)
