@@ -1,3 +1,7 @@
 build/
 .xmake/
 ignore/
+
+# Proprietary local protocol references; never publish with project sources.
+libfprint-2-tod1-elan.decmp
+libfprint-2-tod1-elan.so

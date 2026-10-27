@@ -35,3 +35,20 @@ target("pam_elanfp")
     add_files("src/pam_elanfp.c")
     add_packages("libusb")
     add_syslinks("pam")
+
+-- Experimental local software authenticator for browser WebAuthn.
+-- OpenSSL 3 libcrypto provides randomness, SHA-256, EC keys and ES256.
+target("elanfp-fido")
+    set_kind("binary")
+    add_deps("elanfp-core")
+    add_files("src/fido/*.c")
+    add_packages("libusb")
+    add_syslinks("crypto")
+
+target("test-fido")
+    set_kind("binary")
+    set_default(false)
+    add_files("tests/fido.c", "src/fido/ctap.c", "src/fido/cbor.c",
+              "src/fido/credential.c")
+    add_includedirs("src/fido")
+    add_syslinks("crypto")

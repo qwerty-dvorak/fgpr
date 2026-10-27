@@ -1,0 +1,25 @@
+#!/sbin/openrc-run
+
+description="Local fingerprint-backed software FIDO2 authenticator"
+command="/usr/local/bin/elanfp-fido"
+command_args="${elanfp_user} /var/lib/elanfp-fido /var/lib/elanfp"
+command_background="yes"
+pidfile="/run/${RC_SVCNAME}.pid"
+output_log="/var/log/elanfp-fido.log"
+error_log="/var/log/elanfp-fido.log"
+retry="TERM/5/KILL/5"
+
+depend() {
+	need localmount
+	after udev
+}
+
+start_pre() {
+	if [ -z "${elanfp_user}" ]; then
+		eerror "Set elanfp_user in /etc/conf.d/elanfp-fido"
+		return 1
+	fi
+	modprobe uhid || return 1
+	umask 077
+	checkpath --file --mode 0600 --owner root:root /var/log/elanfp-fido.log
+}
